@@ -1,5 +1,5 @@
 # yamllint configuration for the lab.
-# Built up during Block A — we disable line-length because Compose files
+# Built up during Part 1 — we disable line-length because Compose files
 # often have legitimately long environment lines that don't benefit from wrapping.
 
 extends: default

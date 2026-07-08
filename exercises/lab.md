@@ -415,17 +415,19 @@ same triggers, jobs, and step order; step `name:` labels and comments may differ
   required checks match on (the workflow's `name:` is cosmetic). Mind the caveat in
   GitHub's docs: a PR touching both docs *and* code triggers both workflows, and two
   check runs then report under each name.
-- **Matrix `ign-lint` over individual views** so each view surfaces as its own check — a
-  one-entry matrix today, but the pattern that scales as the HMI grows. (For now the single
-  globbed step is plenty; the matrix is about isolating *which* view broke, not speed.)
+- **Add the manual Run button.** From the triggers slide: add `workflow_dispatch:` to your
+  `on:` block and push. The Actions tab grows a *Run workflow* button — click it and CI runs
+  without a PR or a push. (Part 3's runner demo uses the same trigger.)
+- **Watch GitHub censor a secret, in your own fork.** You saw the demo in the We-do; now do
+  it yourself: `gh secret set EXAMPLE_SECRET --body "hunter2"`, add a step that runs
+  `echo "leak? ${{ secrets.EXAMPLE_SECRET }}"`, push, and read the log — it prints
+  `leak? ***`. Delete the echo step afterwards; the exercise is watching the masking work,
+  not keeping a leak around.
 - **Cancel superseded runs.** Add a workflow-level `concurrency:` group
   (`group: ${{ github.workflow }}-${{ github.ref }}`, `cancel-in-progress: true`) so a
   force-push doesn't leave a stale run burning minutes — the `concurrency` box from the
-  mental-model diagram, in practice.
-- **Read, don't implement:** the difference between `on: pull_request` and
-  `on: pull_request_target`. The latter runs the base-branch workflow *with secrets*
-  against the PR's code — a well-known privilege-escalation footgun. See the
-  [GitHub Security Lab post](https://securitylab.github.com/resources/github-actions-preventing-pwn-requests/).
+  mental-model diagram, in practice. Prove it: push two commits in quick succession and
+  watch the first run flip to *cancelled*.
 
 ### Debrief
 

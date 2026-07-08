@@ -291,28 +291,26 @@ code .
     <div class="cols2">
       <div class="steps">
         <div class="step"><div class="ix t">1</div><div class="tx"><b>Boot the gateway.</b> Run <span class="inlinecode">cp .env.example .env</span> then <span class="inlinecode">scripts/setup.sh</span>. Wait for RUNNING; open <span class="inlinecode">http://localhost:8088</span>. This is the lab's deployment environment: only <span class="inlinecode">./projects</span> is bind-mounted into it, so the files the linters check <b>are</b> the files the gateway runs. (<span class="inlinecode">scripts/teardown.sh</span> stops it.)</div></div>
-        <div class="step"><div class="ix t">2</div><div class="tx"><b>Install the linters</b> (see code block).</div></div>
+        <div class="step"><div class="ix t">2</div><div class="tx"><b>Install the linters</b> (see block). The venv sidesteps pip's <span class="inlinecode">externally-managed-environment</span> error; <span class="inlinecode">ign-lint</span> needs Python 3.10+. Skip brew's yamllint — the pinned pip version is the one CI uses.</div></div>
         <div class="step"><div class="ix t">3</div><div class="tx"><b>Reference reading (optional)</b> lives in <span class="inlinecode">docs/validation-and-linters.md</span> and <span class="inlinecode">docs/self-hosted-runners.md</span>: cheat sheets, not homework.</div></div>
       </div>
       <div>
-        <div class="code"><pre><span class="cm"># 1: boot the gateway — wait for RUNNING</span>
-cp .env.example .env
-scripts/setup.sh          <span class="cm"># → http://localhost:8088</span>
-
-<span class="cm"># 2: linters — macOS (bare python3 is 3.9, so get 3.12 too)</span>
-brew install shellcheck actionlint python@3.12
-<span class="cm"># 2: linters — Debian/Ubuntu/WSL (no brew there)</span>
-sudo apt install shellcheck python3-venv
+        <div class="code"><pre><span class="cm"># 2: linters — Debian/Ubuntu/WSL</span>
+sudo apt update
+sudo apt install shellcheck python3-venv python3-pip
 <span class="cm">#    actionlint has no apt package: release binary →</span>
 <span class="cm">#    /usr/local/bin · one-liner in lab.md § Setup</span>
-<span class="cm"># 2: venv on Python 3.10+ — macOS: python3.12 · Linux: python3</span>
-python3.12 -m venv .venv &amp;&amp; source .venv/bin/activate  <span class="cm"># Linux: python3</span>
+
+<span class="cm"># 2b: install a supported Python (ign-lint needs >=3.10,&lt;3.14)</span>
+sudo add-apt-repository ppa:deadsnakes/ppa
+sudo apt update &amp;&amp; sudo apt install python3.13 python3.13-venv
+
+<span class="cm"># 2c: venv on that Python, then the pinned tools</span>
+python3.13 -m venv .venv &amp;&amp; source .venv/bin/activate
+python --version        <span class="cm"># verify it's 3.13 inside the venv</span>
+pip install --upgrade pip
 pip install yamllint==1.35.1 ign-lint==0.6.1</pre></div>
         <div class="goal warn-g" style="margin-top:18px">
-          <span class="badge">No python3.12?</span>
-          <p><b><span class="inlinecode">ign-lint</span> needs Python 3.10–3.13 (we standardize on 3.12).</b> If your WSL/Debian box doesn't have <span class="inlinecode">python3.12</span> and you can't install it, <b>skip ign-lint</b> — run the other four checks, and we'll skip its three Perspective-view findings (brittle binding, runaway poll, mis-named component).</p>
-        </div>
-        <div class="goal warn-g" style="margin-top:14px">
           <span class="badge">Port 8088 busy?</span>
           <p>That's your <b>Lab 02 gateway</b>, still running from yesterday — <span class="inlinecode">restart: unless-stopped</span> keeps it alive, reboots included. Deliberate lesson: a port is a machine-wide resource, and two gateways can't share one. Tear it down first (its state survives in its volume): <span class="inlinecode">cd ../cicd-lab-02-* &amp;&amp; scripts/teardown.sh</span>, then re-run <span class="inlinecode">scripts/setup.sh</span> here.</p>
         </div>
@@ -724,44 +722,45 @@ git commit -am <span class="cmd2">"test: should be blocked"</span>
   <div class="foot"><span>Mustry Academy · CI/CD for Ignition</span><span>Stretch 1 of 2 · optional</span></div>
 </section>
 
-<!-- 17 · STRETCH 2 · MATRIX + PULL_REQUEST_TARGET -->
+<!-- 17 · STRETCH 2 · DISPATCH + SECRET MASKING + CONCURRENCY -->
 <section class="slide">
   <div class="topbar">
     <div class="brandrow"><img class="logo-img" src="logos/OriginalDark.png" alt="Mustry Solutions"></div>
     <div class="stage">Optional stretch</div>
   </div>
   <div class="body">
-    <div class="sechead"><span class="num phase2">OPTIONAL · 2</span><div><div class="title">Stretch 2: a matrix, a footgun, and a SHA pin</div><div class="lead">Three independent extras from <span class="inlinecode">exercises/lab.md</span>: do any, all, or none.</div></div></div>
+    <div class="sechead"><span class="num phase2">OPTIONAL · 2</span><div><div class="title">Stretch 2: three small workflow extras</div><div class="lead">Three things straight from the teaching, each done and verified in minutes: do any, all, or none.</div></div></div>
     <div class="cols2">
       <div>
         <div class="steps">
-          <div class="step"><div class="ix p">A</div><div class="tx"><b>Matrix ign-lint over individual views</b> so each view surfaces as its own check. One entry today, but it's the pattern that scales as the HMI grows: it isolates <i>which</i> view broke, not speed.</div></div>
-          <div class="step"><div class="ix p">B</div><div class="tx"><b>Read, don't implement:</b> <span class="inlinecode">on: pull_request</span> vs <span class="inlinecode">on: pull_request_target</span>. The latter runs the base branch's workflow <b>with secrets</b> against the PR's code: a well-known privilege-escalation footgun. Search: <i>GitHub Security Lab, "preventing pwn requests"</i>.</div></div>
-          <div class="step"><div class="ix p">C</div><div class="tx"><b>Pin actions by SHA.</b> Swap one <span class="inlinecode">@v4</span> tag for its full commit SHA. A tag can be silently re-pointed by its owner — a supply-chain risk that bites harder once a self-hosted runner sits inside a plant network. Let Dependabot bump it.</div></div>
+          <div class="step"><div class="ix p">A</div><div class="tx"><b>Add the manual Run button.</b> From the triggers slide: add <span class="inlinecode">workflow_dispatch:</span> to your <span class="inlinecode">on:</span> block and push. The Actions tab grows a <b>Run workflow</b> button: click it and CI runs without a PR or a push.</div></div>
+          <div class="step"><div class="ix p">B</div><div class="tx"><b>Watch GitHub censor a secret, in your own fork.</b> You saw the demo in the We-do; now do it yourself: create an <span class="inlinecode">EXAMPLE_SECRET</span>, echo it in a step, and read the log: <span class="inlinecode">***</span>. Delete the echo step afterwards.</div></div>
+          <div class="step"><div class="ix p">C</div><div class="tx"><b>Cancel superseded runs.</b> The <span class="inlinecode">concurrency</span> box from the mental-model diagram, in practice: add the group, push two commits quickly, and watch the first run flip to <b>cancelled</b> instead of burning minutes to the end.</div></div>
         </div>
       </div>
       <div>
-        <div class="code"><pre><span class="cm"># A: the matrix pattern</span>
-  lint-views:
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        view:
-          - <span class="cmd2">"projects/lab-project/com.inductiveautomation.perspective/views/pages/overview/view.json"</span>
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with: {python-version: <span class="cmd2">"3.12"</span>}
-      - run: pip install ign-lint==0.6.1
-      - run: ign-lint --config rule_config.json --files <span class="cmd2">"${{ matrix.view }}"</span></pre></div>
-        <div class="goal warn-g" style="margin-top:16px">
-          <span class="badge">Red flag</span>
-          <p>If <span class="inlinecode">pull_request_target</span> ever appears in your own workflows, you should be able to explain <b>exactly</b> why, and what you did to keep it safe.</p>
+        <div class="code"><pre><span class="cm"># A: a manual Run button (add under on:)</span>
+  workflow_dispatch:        <span class="cm"># Actions tab → "Run workflow"</span>
+
+<span class="cm"># B: prove secret masking in YOUR fork</span>
+gh secret set EXAMPLE_SECRET --body <span class="cmd2">"hunter2"</span>
+<span class="cm">#    then add a step, push, and read the log:</span>
+      - run: echo <span class="cmd2">"leak? ${{ secrets.EXAMPLE_SECRET }}"</span>
+<span class="cm">#    log prints → leak? ***</span>
+
+<span class="cm"># C: cancel superseded runs (workflow-level)</span>
+concurrency:
+  group: <span class="cmd2">"${{ github.workflow }}-${{ github.ref }}"</span>
+  cancel-in-progress: true
+<span class="cm">#    push twice fast → first run: cancelled</span></pre></div>
+        <div class="goal" style="margin-top:16px">
+          <span class="badge">Watch it happen</span>
+          <p>Each extra has a <b>visible payoff within one push</b>: a new button in the Actions tab, <span class="inlinecode">***</span> in a log line, a stale run marked <b>cancelled</b>. If you can't see the payoff, it isn't done yet.</p>
         </div>
       </div>
     </div>
   </div>
-  <div class="foot"><span>Mustry Academy · CI/CD for Ignition</span><span>Stretch 2 of 2 · optional</span></div>
+  <div class="foot"><span>Mustry Academy · CI/CD for Ignition</span><span>Stretch 2 of 2 · optional · pick any</span></div>
 </section>
 
 <!-- 18 · DONE -->
